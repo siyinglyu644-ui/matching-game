@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>Matching</title>
+<style>
+body {
+    margin: 0;
+    font-family: "Microsoft YaHei", sans-serif;
+    background: #dff1ff;
+    text-align: center;
+}
+
+h1 {
+    margin: 20px 0;
+    font-size: 48px;
+}
+
+.game-area {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 15px;
+    padding: 20px;
+    max-width: 1100px;
+    margin: auto;
+}
+
+.image-card img {
+    width: 150px;
+    height: 120px;
+    object-fit: cover;
+    border-radius: 10px;
+    border: 3px solid #fff;
+    cursor: pointer;
+}
+
+.word-card {
+    padding: 15px;
+    background: rgba(255, 230, 120, 0.8);
+    border-radius: 12px;
+    font-size: 20px;
+    cursor: pointer;
+    box-shadow: 0 6px 0 #d6b800;
+    user-select: none;
+}
+
+.selected {
+    outline: 4px solid #4caf50;
+}
+
+.shake {
+    animation: shake 0.4s;
+}
+
+@keyframes shake {
+    0% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    50% { transform: translateX(8px); }
+    75% { transform: translateX(-8px); }
+    100% { transform: translateX(0); }
+}
+
+.classify-area {
+    display: flex;
+    justify-content: space-around;
+    margin: 30px;
+}
+
+.box {
+    width: 40%;
+    min-height: 200px;
+    border: 3px dashed #333;
+    border-radius: 15px;
+    padding: 10px;
+}
+
+.box h2 {
+    margin-top: 0;
+}
+
+.center-popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    display: none;
+    z-index: 10;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.center-popup button {
+    margin: 10px;
+    padding: 10px 20px;
+    font-size: 18px;
+}
+
+.success {
+    display: none;
+    margin-top: 60px;
+}
+
+.trophy {
+    font-size: 120px;
+}
+</style>
+</head>
+
+<body>
+
+<h1 id="title">Matching</h1>
+
+<div class="game-area" id="images"></div>
+<div class="game-area" id="words"></div>
+
+<div class="classify-area">
+    <div class="box" id="chinaBox"><h2>中国</h2></div>
+    <div class="box" id="thaiBox"><h2>泰国</h2></div>
+</div>
+
+<div class="center-popup" id="popup">
+    <img id="popupImg" width="120"><br><br>
+    <div id="popupWord" class="word-card"></div><br>
+    <button onclick="classify('中国')">中国</button>
+    <button onclick="classify('泰国')">泰国</button>
+</div>
+
+<div class="success" id="success">
+    <div>闯关成功！</div>
+    <div class="trophy">🏆</div>
+</div>
+
+<audio id="rightSound" src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YQAAAAA="></audio>
+<audio id="winSound" src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YQAAAAA="></audio>
+
+<script>
+const images = document.getElementById("images");
+const words = document.getElementById("words");
+const popup = document.getElementById("popup");
+const popupImg = document.getElementById("popupImg");
+const popupWord = document.getElementById("popupWord");
+const chinaBox = document.getElementById("chinaBox");
+const thaiBox = document.getElementById("thaiBox");
+const title = document.getElementById("title");
+const success = document.getElementById("success");
+const winSound = document.getElementById("winSound");
+
+const data = [
+ { word:"贺卡", country:"中国", img:"1.png" },
+ { word:"蜡烛", country:"中国", img:"2.png" },
+ { word:"鞠躬礼", country:"中国", img:"3.png" },
+ { word:"脱鞋", country:"泰国", img:"4.png" },
+ { word:"花盘", country:"泰国", img:"5.png" },
+ { word:"合十礼", country:"泰国", img:"6.png" }
+];
+
+// —— 随机打乱函数 —— //
+function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+}
+
+const imageData = [...data];
+const wordData = [...data];
+shuffle(imageData);
+shuffle(wordData);
+
+let selectedImage = null;
+let selectedWord = null;
+let matchedCount = 0;
+let currentItem = null;
+
+// —— 生成图片 —— //
+imageData.forEach(item=>{
+    const imgDiv = document.createElement("div");
+    imgDiv.className = "image-card";
+
+    const img = document.createElement("img");
+    img.src = item.img;
+    imgDiv.appendChild(img);
+
+    imgDiv.onclick = ()=>selectImage(imgDiv,item);
+    images.appendChild(imgDiv);
+});
+
+// —— 生成文字 —— //
+wordData.forEach(item=>{
+    const wordDiv = document.createElement("div");
+    wordDiv.className = "word-card";
+    wordDiv.innerText = item.word;
+
+    wordDiv.onclick = ()=>selectWord(wordDiv,item);
+    words.appendChild(wordDiv);
+});
+
+function selectImage(el,item){
+    selectedImage = {el,item};
+    el.classList.add("selected");
+}
+
+function selectWord(el,item){
+    selectedWord = {el,item};
+    el.classList.add("selected");
+
+    if(selectedImage){
+        if(selectedImage.item.word === item.word){
+            document.getElementById("rightSound").play();
+            selectedImage.el.remove();
+            selectedWord.el.remove();
+            currentItem = item;
+            showPopup();
+        }else{
+            shake(el);
+            shake(selectedImage.el);
+            navigator.vibrate?.(200);
+        }
+        resetSelect();
+    }
+}
+
+function resetSelect(){
+    document.querySelectorAll(".selected").forEach(e=>e.classList.remove("selected"));
+    selectedImage = selectedWord = null;
+}
+
+function shake(el){
+    el.classList.add("shake");
+    setTimeout(()=>el.classList.remove("shake"),400);
+}
+
+function showPopup(){
+    popup.style.display="block";
+    popupImg.src = currentItem.img;
+    popupWord.innerText = currentItem.word;
+}
+
+function classify(c){
+    if(c === currentItem.country){
+        (c==="中国"?chinaBox:thaiBox).innerHTML += `<div>${currentItem.word}</div>`;
+        matchedCount++;
+        popup.style.display="none";
+        if(matchedCount===6){
+            title.style.display="none";
+            success.style.display="block";
+            winSound.play();
+        }
+    }else{
+        shake(popup);
+        navigator.vibrate?.(300);
+    }
+}
+</script>
+
+
+</body>
+</html>
